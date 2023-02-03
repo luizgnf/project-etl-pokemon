@@ -168,6 +168,12 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  metabase:
+    image: metabase/metabase:v0.45.2.1 
+    restart: always
+    ports:
+      - 3000:3000
+  
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
