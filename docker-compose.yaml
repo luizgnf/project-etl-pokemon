@@ -173,6 +173,10 @@ services:
     restart: always
     ports:
       - 3000:3000
+    volumes:
+      - metabase-volume:/metabase-data
+    environment:
+      - "MB_DB_FILE=/metabase-data/metabase.db"
   
   airflow-init:
     <<: *airflow-common
@@ -288,3 +292,4 @@ services:
 
 volumes:
   postgres-db-volume:
+  metabase-volume:
