@@ -41,6 +41,7 @@ def create_extraction_dags(
     airflow_postgres_connection = "rds_postgres_connection"
     postgres_landing_schema = "landing"
     postgres_current_schema = "currentraw"
+    postgres_history_schema = "historyraw"
 
     # Compound variables
     dag_id_compound = f"{dag_id}_v{dag_version}"
@@ -96,6 +97,22 @@ def create_extraction_dags(
             postgres_table = f"{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}",
             postgres_columns_list = postgres_columns_list
         )
+        
+        # Task create history table
+        create_history_tbl = PostgresOperator(
+            task_id = "create_history_tbl",
+            postgres_conn_id = airflow_postgres_connection,
+            sql = f"CREATE TABLE IF NOT EXISTS {postgres_history_schema}.{origin_type}_{api_endpoint} (rawdata jsonb, reference_datetime timestamp, load_datetime timestamp default CURRENT_TIMESTAMP);",
+        )
+
+        # Task insert from landing to history table
+        load_history_tbl = PostgresOperator(
+            task_id = "load_history_tbl",
+            postgres_conn_id = airflow_postgres_connection,
+            sql = f"""
+                INSERT INTO {postgres_history_schema}.{origin_type}_{api_endpoint} (rawdata, reference_datetime) 
+                SELECT rawdata, '{{{{ts}}}}' FROM {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}};""",
+        )
 
         # Task create current table
         create_current_tbl = PostgresOperator(
@@ -144,6 +161,7 @@ def create_extraction_dags(
         )
 
         initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres
-        transfer_s3_to_postgres >> create_current_tbl >> load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
+        transfer_s3_to_postgres >> create_history_tbl >> load_history_tbl >> create_current_tbl >> load_current_tbl_upd 
+        load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
     
     return dag
