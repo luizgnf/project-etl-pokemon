@@ -19,7 +19,8 @@ dag_full = create_extraction_dags(
     api_request_type = full_request,
     api_endpoint = 'pokemon',
     extract_keys = ["id"],
-    postgres_columns_list = ["rawdata"]
+    postgres_columns_list = ["rawdata"],
+    history_saving = True
 )
 
 dag_hourly = create_extraction_dags(
