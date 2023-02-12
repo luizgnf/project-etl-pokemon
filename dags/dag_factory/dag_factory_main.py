@@ -6,6 +6,8 @@ from airflow.operators.dummy_operator import DummyOperator
 from airflow.sensors.external_task_sensor import ExternalTaskSensor
 from airflow.operators.latest_only_operator import LatestOnlyOperator
 from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.operators.python import BranchPythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 
 # Custom operators
 from custom.operators.custom_api_to_s3 import ApiToS3Operator
@@ -28,6 +30,7 @@ def create_extraction_dags(
     api_endpoint,
     extract_keys,
     postgres_columns_list = None,
+    history_saving = True,
     only_latest = False,
     sensors_list = None
 ): 
@@ -45,7 +48,10 @@ def create_extraction_dags(
 
     # Compound variables
     dag_id_compound = f"{dag_id}_v{dag_version}"
-
+    postgres_landing_table = f"{postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}"
+    postgres_current_table = f"{postgres_current_schema}.{origin_type}_{api_endpoint}"
+    postgres_history_table = f"{postgres_history_schema}.{origin_type}_{api_endpoint}"
+    
     with DAG(
         dag_id = dag_id_compound, 
         default_args = default_args, 
@@ -76,14 +82,14 @@ def create_extraction_dags(
         drop_existing_landing_tbl = PostgresOperator(
             task_id = "drop_exists_landing_tbl",
             postgres_conn_id = airflow_postgres_connection,
-            sql = f"DROP TABLE IF EXISTS {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}; "
+            sql = f"DROP TABLE IF EXISTS {postgres_landing_table}; "
         )
 
         # Task create landing table
         create_landing_tbl = PostgresOperator(
             task_id="create_landing_tbl",
             postgres_conn_id = airflow_postgres_connection,
-            sql = f"CREATE TABLE {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}} (rawdata jsonb);"
+            sql = f"CREATE TABLE {postgres_landing_table} (rawdata jsonb);"
         )
 
         # Task transfer data from S3 to Postgres
@@ -93,8 +99,7 @@ def create_extraction_dags(
             s3_bucket_name = s3_bucket_name,
             s3_bucket_key = f"{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}.json",
             airflow_postgres_connection = airflow_postgres_connection,
-            postgres_schema = postgres_landing_schema,  
-            postgres_table = f"{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}",
+            postgres_table = postgres_landing_table,
             postgres_columns_list = postgres_columns_list
         )
         
@@ -102,7 +107,12 @@ def create_extraction_dags(
         create_history_tbl = PostgresOperator(
             task_id = "create_history_tbl",
             postgres_conn_id = airflow_postgres_connection,
-            sql = f"CREATE TABLE IF NOT EXISTS {postgres_history_schema}.{origin_type}_{api_endpoint} (rawdata jsonb, reference_datetime timestamp, load_datetime timestamp default CURRENT_TIMESTAMP);",
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS {postgres_history_table} (
+                    rawdata jsonb
+                    , reference_datetime timestamp
+                    , load_datetime timestamp default CURRENT_TIMESTAMP
+                );"""
         )
 
         # Task insert from landing to history table
@@ -110,15 +120,16 @@ def create_extraction_dags(
             task_id = "load_history_tbl",
             postgres_conn_id = airflow_postgres_connection,
             sql = f"""
-                INSERT INTO {postgres_history_schema}.{origin_type}_{api_endpoint} (rawdata, reference_datetime) 
-                SELECT rawdata, '{{{{ts}}}}' FROM {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}};""",
+                INSERT INTO {postgres_history_table} (rawdata, reference_datetime) 
+                SELECT rawdata, '{{{{ts}}}}' FROM {postgres_landing_table};"""
         )
 
         # Task create current table
         create_current_tbl = PostgresOperator(
             task_id = "create_current_tbl",
             postgres_conn_id = airflow_postgres_connection,
-            sql = f"CREATE TABLE IF NOT EXISTS {postgres_current_schema}.{origin_type}_{api_endpoint} (rawdata jsonb);"
+            sql = f"CREATE TABLE IF NOT EXISTS {postgres_current_table} (rawdata jsonb);",
+            trigger_rule = TriggerRule.NONE_FAILED
         )
 
         # Task insert from landing to current table if data not exists
@@ -126,16 +137,15 @@ def create_extraction_dags(
             task_id = "load_current_tbl_insert",
             postgres_conn_id = airflow_postgres_connection,
             sql = f"""
-                INSERT INTO {postgres_current_schema}.{origin_type}_{api_endpoint} (rawdata)
-                SELECT rawdata FROM {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}} a
+                INSERT INTO {postgres_current_table} (rawdata)
+                SELECT rawdata FROM {postgres_landing_table} a
                 WHERE NOT EXISTS (
                     SELECT 1 
-                    FROM {postgres_current_schema}.{origin_type}_{api_endpoint} b
+                    FROM {postgres_current_table} b
                     WHERE 
                         1=1
                         {create_key_relation(extract_keys)}
-                );
-            """
+                );"""
         )
 
         # Task update from landing to current table if data exists
@@ -143,25 +153,37 @@ def create_extraction_dags(
             task_id = "load_current_tbl_update",
             postgres_conn_id = airflow_postgres_connection,
             sql = f"""
-                UPDATE {postgres_current_schema}.{origin_type}_{api_endpoint} a
+                UPDATE {postgres_current_table} a
                 SET rawdata = b.rawdata
-                FROM {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}} b
+                FROM {postgres_landing_table} b
                 WHERE 
                     1=1
                     AND a.rawdata <> b.rawdata
-                    {create_key_relation(extract_keys)}
-            """
+                    {create_key_relation(extract_keys)}"""
         )
            
         # Task drop landing in the end of load data
         drop_landing_tbl = PostgresOperator(
             task_id = "drop_landing_tbl",
             postgres_conn_id = airflow_postgres_connection,
-            sql = f"DROP TABLE IF EXISTS {postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}; "
+            sql = f"DROP TABLE IF EXISTS {postgres_landing_table};"
         )
 
+        # Chose between saving or not history table
+        history_saving_branch = BranchPythonOperator(
+            task_id = "history_saving_path",
+            python_callable = lambda x: create_history_tbl.task_id if x == True else create_current_tbl.task_id,
+            op_kwargs = {"x": history_saving}
+        )
+        
+        # Task path not saving history
         initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres
-        transfer_s3_to_postgres >> create_history_tbl >> load_history_tbl >> create_current_tbl >> load_current_tbl_upd 
+        transfer_s3_to_postgres >> history_saving_branch >> create_current_tbl >> load_current_tbl_upd 
         load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
-    
+        
+        # Task path saving history
+        initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres
+        transfer_s3_to_postgres >> history_saving_branch >> create_history_tbl >> load_history_tbl >> create_current_tbl 
+        create_current_tbl >> load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
+
     return dag

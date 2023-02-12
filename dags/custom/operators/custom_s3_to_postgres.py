@@ -15,7 +15,6 @@ class S3ToPostgresOperator(BaseOperator):
             s3_bucket_name,
             s3_bucket_key,
             airflow_postgres_connection,
-            postgres_schema,
             postgres_table,
             postgres_columns_list,
             *args, **kwargs
@@ -26,7 +25,6 @@ class S3ToPostgresOperator(BaseOperator):
         self.s3_bucket_name = s3_bucket_name
         self.s3_bucket_key = s3_bucket_key
         self.airflow_postgres_connection = airflow_postgres_connection
-        self.postgres_schema = postgres_schema
         self.postgres_table = postgres_table
         self.postgres_columns_list = postgres_columns_list
 
@@ -51,7 +49,7 @@ class S3ToPostgresOperator(BaseOperator):
                 postgres_columns = f'({", ".join(self.postgres_columns_list)})'                
 
             postgres_cur.copy_expert(f"""
-                COPY {self.postgres_schema}.{self.postgres_table} {postgres_columns} FROM STDIN
+                COPY {self.postgres_table} {postgres_columns} FROM STDIN
             """, tmp_file)            
             postgres_conn.commit()
             self.log.info(f'Data copied to {self.postgres_table} Postgres table.')

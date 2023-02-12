@@ -427,4 +427,5 @@ licenses/LICENSES-ui.txt
 /target-airflow
 
 # other files
-dags/custom/functions/test_extraction.py
+dags/custom/functions/function_draft.py
+dags/dag_draft.py
