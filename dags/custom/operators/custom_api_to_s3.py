@@ -13,7 +13,7 @@ class ApiToS3Operator(BaseOperator):
     @apply_defaults
     def __init__(
             self,
-            api_request_type,
+            api_request,
             api_endpoint,
             airflow_s3_connection,
             s3_bucket_name,
@@ -23,7 +23,7 @@ class ApiToS3Operator(BaseOperator):
         ):
         
         super().__init__(*args, **kwargs)
-        self.api_request_type = api_request_type
+        self.api_request = api_request
         self.api_endpoint = api_endpoint
         self.airflow_s3_connection = airflow_s3_connection
         self.s3_bucket_name = s3_bucket_name
@@ -35,7 +35,7 @@ class ApiToS3Operator(BaseOperator):
         with NamedTemporaryFile('w', suffix = '.json') as tmp_file:
             
             # Extract API data
-            result = self.api_request_type(self.api_endpoint)   
+            result = self.api_request(self.api_endpoint)   
             self.log.info(f'Full extraction finished. {len(result)} total items.')
 
             # Clean and save as ndjson file

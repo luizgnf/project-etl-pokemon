@@ -11,6 +11,7 @@ from airflow.utils.trigger_rule import TriggerRule
 
 # Custom operators
 from custom.operators.custom_api_to_s3 import ApiToS3Operator
+from custom.operators.custom_crawler_to_s3 import CrawlerToS3Operator
 from custom.operators.custom_s3_to_postgres import S3ToPostgresOperator
 
 # Utils
@@ -20,15 +21,17 @@ from dag_factory.dag_factory_utils import *
 # Main structure
 def create_extraction_dags(
     origin_type,
+    origin_name,
     dag_id,
     dag_version,
     start_date,
     schedule_interval,
     tags,
     default_args,
-    api_request_type,
-    api_endpoint,
-    extract_keys,
+    extraction_method,
+    extraction_object,
+    extraction_keys,
+    extraction_parameters = None,
     postgres_columns_list = None,
     history_saving = True,
     only_latest = False,
@@ -48,9 +51,10 @@ def create_extraction_dags(
 
     # Compound variables
     dag_id_compound = f"{dag_id}_v{dag_version}"
-    postgres_landing_table = f"{postgres_landing_schema}.{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}"
-    postgres_current_table = f"{postgres_current_schema}.{origin_type}_{api_endpoint}"
-    postgres_history_table = f"{postgres_history_schema}.{origin_type}_{api_endpoint}"
+    s3_bucket_key = f"{origin_name}_{extraction_object}_{{{{ts_nodash}}}}.json"
+    postgres_landing_table = f"{postgres_landing_schema}.{origin_name}_{extraction_object}_{{{{ts_nodash}}}}"
+    postgres_current_table = f"{postgres_current_schema}.{origin_name}_{extraction_object}"
+    postgres_history_table = f"{postgres_history_schema}.{origin_name}_{extraction_object}"
     
     with DAG(
         dag_id = dag_id_compound, 
@@ -68,16 +72,33 @@ def create_extraction_dags(
         )
 
         # Task extract data from API to S3
-        extract_data_to_s3 = ApiToS3Operator(
-            task_id = f"{origin_type}_to_s3",
-            api_request_type = api_request_type,
-            api_endpoint = api_endpoint,
-            airflow_s3_connection = airflow_s3_connection,
-            s3_bucket_name = s3_bucket_name,
-            s3_bucket_key = f"{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}.json",
-            s3_bucket_replace = s3_bucket_replace
-        )
+        if origin_type == "api":
+            extract_data_to_s3 = ApiToS3Operator(
+                task_id = f"{origin_name}_to_s3",
+                api_request = extraction_method,
+                api_endpoint = extraction_object,
+                airflow_s3_connection = airflow_s3_connection,
+                s3_bucket_name = s3_bucket_name,
+                s3_bucket_key = s3_bucket_key,
+                s3_bucket_replace = s3_bucket_replace
+            )
 
+        # Task extract data from Crawler to S3
+        elif origin_type == "webcrawler":
+            extract_data_to_s3 = CrawlerToS3Operator(
+                task_id = f"{origin_name}_to_s3",
+                webcrawler_request = extraction_method,
+                airflow_postgres_connection = airflow_postgres_connection,
+                postgres_sql_query = extraction_parameters["query"],
+                airflow_s3_connection = airflow_s3_connection,
+                s3_bucket_name = s3_bucket_name,
+                s3_bucket_key = s3_bucket_key,
+                s3_bucket_replace = s3_bucket_replace
+            )
+            
+        else: 
+            raise ValueError('Extraction method not implemented.')
+            
         # Task drop landing table if already exists
         drop_existing_landing_tbl = PostgresOperator(
             task_id = "drop_exists_landing_tbl",
@@ -97,7 +118,7 @@ def create_extraction_dags(
             task_id = "s3_to_postgres",
             airflow_s3_connection = airflow_s3_connection,
             s3_bucket_name = s3_bucket_name,
-            s3_bucket_key = f"{origin_type}_{api_endpoint}_{{{{ts_nodash}}}}.json",
+            s3_bucket_key = s3_bucket_key,
             airflow_postgres_connection = airflow_postgres_connection,
             postgres_table = postgres_landing_table,
             postgres_columns_list = postgres_columns_list
@@ -144,7 +165,7 @@ def create_extraction_dags(
                     FROM {postgres_current_table} b
                     WHERE 
                         1=1
-                        {create_key_relation(extract_keys)}
+                        {create_key_relation(extraction_keys)}
                 );"""
         )
 
@@ -159,7 +180,7 @@ def create_extraction_dags(
                 WHERE 
                     1=1
                     AND a.rawdata <> b.rawdata
-                    {create_key_relation(extract_keys)}"""
+                    {create_key_relation(extraction_keys)}"""
         )
            
         # Task drop landing in the end of load data
