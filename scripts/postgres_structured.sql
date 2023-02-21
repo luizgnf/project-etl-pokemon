@@ -87,7 +87,7 @@ FROM currentraw.poketcg_cards;
 CREATE OR REPLACE VIEW structured.poketcg_cards_types AS
 SELECT
     rawdata->>'id'::text AS card_id
-    , jsonb_array_elements(rawdata->'types')::text AS types    
+    , jsonb_array_elements_text(rawdata->'types') AS types    
 FROM currentraw.poketcg_cards;
 
 -- VIEW: poketcg_cards_subtypes
@@ -95,7 +95,7 @@ FROM currentraw.poketcg_cards;
 CREATE OR REPLACE VIEW structured.poketcg_cards_subtypes AS
 SELECT
     rawdata->>'id'::text AS card_id
-    , jsonb_array_elements(rawdata->'subtypes')::text AS subtypes    
+    , jsonb_array_elements_text(rawdata->'subtypes') AS subtypes    
 FROM currentraw.poketcg_cards;
 
 -- VIEW: poketcg_cards_evolvesTo
@@ -103,7 +103,7 @@ FROM currentraw.poketcg_cards;
 CREATE OR REPLACE VIEW structured.poketcg_cards_evolvesTo AS
 SELECT
     rawdata->>'id'::text AS card_id
-    , jsonb_array_elements(rawdata->'evolvesTo')::text AS evolvesTo    
+    , jsonb_array_elements_text(rawdata->'evolvesTo') AS evolvesTo    
 FROM currentraw.poketcg_cards;
 
 -- VIEW: poketcg_cards_rules
@@ -111,7 +111,7 @@ FROM currentraw.poketcg_cards;
 CREATE OR REPLACE VIEW structured.poketcg_cards_rules AS
 SELECT
     rawdata->>'id'::text AS card_id
-    , jsonb_array_elements(rawdata->'rules')::text AS rules    
+    , jsonb_array_elements_text(rawdata->'rules') AS rules    
 FROM currentraw.poketcg_cards;
 
 -- VIEW: poketcg_cards_nationalPokedexNumbers
@@ -127,7 +127,7 @@ FROM currentraw.poketcg_cards;
 CREATE OR REPLACE VIEW structured.poketcg_cards_retreatCost AS
 SELECT
     rawdata->>'id'::text AS card_id
-    , jsonb_array_elements(rawdata->'retreatCost')::text AS retreatCost    
+    , jsonb_array_elements_text(rawdata->'retreatCost') AS retreatCost    
 FROM currentraw.poketcg_cards;
 
 -- VIEW: poketcg_cards_abilities
@@ -169,3 +169,12 @@ SELECT
     , jsonb_array_elements(rawdata->'resistances')->>'type'::text AS resistance_type
     , jsonb_array_elements(rawdata->'resistances')->>'value'::text AS resistance_value  
 FROM currentraw.poketcg_cards;
+
+-- VIEW cardmarket_pricehistory
+
+CREATE OR REPLACE VIEW structured.cardmarket_pricehistory AS
+SELECT
+	rawdata->>'card_id'::text AS card_id
+	, to_date(jsonb_array_elements_text(rawdata->'date'), 'DD.MM.YYYY') AS reference_date
+	, jsonb_array_elements_text(rawdata->'avgsellprice')::float AS avgsellprice
+FROM currentraw.cardmarket_pricehistory;
