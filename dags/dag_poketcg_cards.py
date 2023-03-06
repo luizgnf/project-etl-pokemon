@@ -9,30 +9,32 @@ DEFAULT_ARGS = {
 }
 
 dag_full = create_extraction_dags(
-    origin_type = "poketcg", 
+    origin_type = "api", 
+    origin_name = "poketcg",
     dag_id = "poketcg_cards_full",
     dag_version = "1",
     start_date = datetime(2023, 1, 31, 3, 15),
     schedule_interval = timedelta(days = 1),
     tags = ["pokemon", "tcg", "cards", "s3", "postgres", "daily"],
     default_args = DEFAULT_ARGS,
-    api_request_type = full_request,
-    api_endpoint = 'cards',
-    extract_keys = ["id"],
+    extraction_method = full_request,
+    extraction_object = 'cards',
+    extraction_keys = ["id"],
     postgres_columns_list = ["rawdata"],
-    history_saving = False
+    history_saving = True
 )
 
 dag_hourly = create_extraction_dags(
-    origin_type = "poketcg", 
+    origin_type = "api", 
+    origin_name = "poketcg",
     dag_id = "poketcg_cards_hourly",
     dag_version = "1",
     start_date = datetime(2023, 1, 31, 3, 15),
     schedule_interval = timedelta(hours = 1),
     tags = ["pokemon", "tcg", "cards", "s3", "postgres", "hourly"],
     default_args = DEFAULT_ARGS,
-    api_request_type = full_request, # prepare intraday function to place here
-    api_endpoint = 'cards',
-    extract_keys = ["id"],
+    extraction_method = full_request, # prepare intraday function to place here
+    extraction_object = 'cards',
+    extraction_keys = ["id"],
     postgres_columns_list = ["rawdata"]
 )

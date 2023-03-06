@@ -1,7 +1,7 @@
--- DATABASE: pokemon_db
+-- DATABASE: pokemon
 
-DROP DATABASE IF EXISTS pokemon_db;
-CREATE DATABASE pokemon_db
+DROP DATABASE IF EXISTS pokemon;
+CREATE DATABASE pokemon
     WITH
     OWNER = admin_pgsql
     ENCODING = 'UTF8'
@@ -10,7 +10,7 @@ CREATE DATABASE pokemon_db
     TABLESPACE = pg_default
     CONNECTION LIMIT = -1
     IS_TEMPLATE = False;
-COMMENT ON DATABASE pokemon_db
+COMMENT ON DATABASE pokemon
 	IS 'datalake for general pokemon information';	
 
 -- SCHEMA: landing

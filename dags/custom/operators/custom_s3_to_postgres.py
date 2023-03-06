@@ -32,7 +32,7 @@ class S3ToPostgresOperator(BaseOperator):
         
         # Download file from S3
         s3_hook = S3Hook(self.airflow_s3_connection)
-        tmp_filepath = s3_hook.download_file(key=self.s3_bucket_key, bucket_name=self.s3_bucket_name)
+        tmp_filepath = s3_hook.download_file(key = self.s3_bucket_key, bucket_name = self.s3_bucket_name)
         self.log.info(f'File {self.s3_bucket_key} downloaded from S3.')
 
         with open(tmp_filepath, 'r') as tmp_file:
