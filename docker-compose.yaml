@@ -82,6 +82,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    ports:
+      - 5432:5432
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -116,8 +118,6 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-    # stdin_open: true 
-    # tty: true
 
   airflow-scheduler:
     <<: *airflow-common
