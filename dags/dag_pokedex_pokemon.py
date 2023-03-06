@@ -21,7 +21,7 @@ dag_full = create_extraction_dags(
     extraction_object = 'pokemon',
     extraction_keys = ["id"],
     postgres_columns_list = ["rawdata"],
-    history_saving = True
+    history_saving = False
 )
 
 dag_hourly = create_extraction_dags(
