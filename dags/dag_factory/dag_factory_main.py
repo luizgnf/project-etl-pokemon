@@ -1,42 +1,66 @@
 
-# Default imports
+# DAG Configurations
 from airflow import DAG
-from contextlib import contextmanager
-from airflow.operators.dummy_operator import DummyOperator
 from airflow.sensors.external_task_sensor import ExternalTaskSensor
+from airflow.utils.trigger_rule import TriggerRule
+
+# DAG Operators
+from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.latest_only_operator import LatestOnlyOperator
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.operators.python import BranchPythonOperator
-from airflow.utils.trigger_rule import TriggerRule
-
-# Custom operators
 from custom.operators.custom_api_to_s3 import ApiToS3Operator
 from custom.operators.custom_crawler_to_s3 import CrawlerToS3Operator
 from custom.operators.custom_s3_to_postgres import S3ToPostgresOperator
 
-# Utils
-from dag_factory.dag_factory_utils import *
+# DAG Utils
+from dag_factory.dag_factory_utils import create_key_relation
+from contextlib import contextmanager
+from datetime import datetime
 
 
-# Main structure
-def create_extraction_dags(
-    origin_type,
-    origin_name,
-    dag_id,
-    dag_version,
-    start_date,
+# Main structure of DAG factory
+def create_pipeline_dag(
+    origin_type: str,
+    origin_name: str,
+    dag_id: str,
+    dag_version: int,
+    start_date: datetime,
     schedule_interval,
-    tags,
-    default_args,
-    extraction_method,
-    extraction_object,
-    extraction_keys,
-    extraction_parameters = None,
-    postgres_columns_list = None,
-    history_saving = True,
-    only_latest = False,
-    sensors_list = None
+    tags: list,
+    default_args: dict,
+    extraction_method: function,
+    extraction_object: str,
+    extraction_keys: list,
+    extraction_parameters: dict = None,
+    postgres_columns_list: list = None,
+    history_saving: bool = True,
+    only_latest: bool = False,
+    sensors_list: bool = None
 ): 
+    """
+    Function responsible for creating and returning a ``DAG object`` with complete data pipeline. This work flow will extract data from a external source, transform and load into relational database. About the arguments:
+
+    ``origin_type`` and ``origin_name`` are related to the external source (API, Crawler).
+
+    ``dag_id`` and ``dag_version`` will compose the DAG identification.
+    
+    ``tags`` are very useful to organize and filter the DAGs. 
+    
+    ``start_date``, ``schedule_interval`` and ``default_args`` are default configurations for DAG runs.
+
+    ``extraction_method`` is the custom function responsible for extract data from external source.  
+    
+    ``extraction_object`` is the endpoint, collection or table name from external source.
+    
+    ``extraction_keys`` are the keys from data result after extraction, required for database upsert.
+    
+    ``extraction_parameters`` (optional) accepts a dict of external parameters, such as queries, API filters.  
+    
+    ``postgres_columns_list`` (optional) accepts a list naming the columns to be copied into database.
+    
+    ``history_saving``: (optional) let you choose between save or not your final data into historical schema. 
+    """
 
     # S3 connection info 
     airflow_s3_connection = "s3_bucket_connection"
@@ -198,13 +222,9 @@ def create_extraction_dags(
         )
         
         # Task path not saving history
-        initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres
-        transfer_s3_to_postgres >> history_saving_branch >> create_current_tbl >> load_current_tbl_upd 
-        load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
+        initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres >> history_saving_branch >> create_current_tbl >> load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
         
         # Task path saving history
-        initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres
-        transfer_s3_to_postgres >> history_saving_branch >> create_history_tbl >> load_history_tbl >> create_current_tbl 
-        create_current_tbl >> load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
+        initialize >> extract_data_to_s3 >> drop_existing_landing_tbl >> create_landing_tbl >> transfer_s3_to_postgres >> history_saving_branch >> create_history_tbl >> load_history_tbl >> create_current_tbl >> load_current_tbl_upd >> load_current_tbl_ins >> drop_landing_tbl
 
     return dag
