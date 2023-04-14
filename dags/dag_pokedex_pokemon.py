@@ -1,5 +1,5 @@
 from airflow import DAG
-from dag_factory.dag_factory_main import create_extraction_dags
+from dag_factory.dag_factory_main import create_pipeline_dag
 from custom.functions.api_pokedex_integration import *
 from datetime import datetime, timedelta
 
@@ -8,7 +8,7 @@ DEFAULT_ARGS = {
     "retry_delay": timedelta(minutes = 10)
 }
 
-dag_full = create_extraction_dags(
+dag_full = create_pipeline_dag(
     origin_type = "api", 
     origin_name = "pokedex",
     dag_id = "pokedex_pokemon_full",
@@ -24,7 +24,7 @@ dag_full = create_extraction_dags(
     history_saving = False
 )
 
-dag_hourly = create_extraction_dags(
+dag_hourly = create_pipeline_dag(
     origin_type = "api", 
     origin_name = "pokedex",
     dag_id = "pokedex_pokemon_hourly",

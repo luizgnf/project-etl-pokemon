@@ -1,5 +1,5 @@
 from airflow import DAG
-from dag_factory.dag_factory_main import create_extraction_dags
+from dag_factory.dag_factory_main import create_pipeline_dag
 from custom.functions.webcrawler_extraction import *
 from datetime import datetime, timedelta
 
@@ -15,7 +15,7 @@ sql_query = """
     FROM currentraw.poketcg_cards
 """
 
-dag_once = create_extraction_dags(
+dag_once = create_pipeline_dag(
     origin_type = "webcrawler", 
     origin_name = "cardmarket",
     dag_id = "crawler_cardmarket_once",

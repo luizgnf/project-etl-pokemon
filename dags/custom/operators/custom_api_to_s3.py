@@ -7,6 +7,9 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 
 
 class ApiToS3Operator(BaseOperator):
+    """
+    Class resp
+    """
 
     template_fields = ['s3_bucket_key']
 
@@ -31,6 +34,9 @@ class ApiToS3Operator(BaseOperator):
         self.s3_bucket_key = s3_bucket_key
 
     def execute(self, context):
+        """
+        Execute resp
+        """
 
         with NamedTemporaryFile('w', suffix = '.json') as tmp_file:
             

@@ -1,6 +1,6 @@
 from airflow import DAG
-from dag_factory.dag_factory_main import create_extraction_dags
-from custom.functions.api_poketcg_integration import *
+from dag_factory.dag_factory_main import create_pipeline_dag
+from custom.functions.api_poketcg_integration import full_request
 from datetime import datetime, timedelta
 
 DEFAULT_ARGS = {
@@ -8,7 +8,7 @@ DEFAULT_ARGS = {
     "retry_delay": timedelta(minutes = 10)
 }
 
-dag_full = create_extraction_dags(
+dag_full = create_pipeline_dag(
     origin_type = "api", 
     origin_name = "poketcg",
     dag_id = "poketcg_cards_full",
@@ -24,7 +24,7 @@ dag_full = create_extraction_dags(
     history_saving = True
 )
 
-dag_hourly = create_extraction_dags(
+dag_hourly = create_pipeline_dag(
     origin_type = "api", 
     origin_name = "poketcg",
     dag_id = "poketcg_cards_hourly",
