@@ -1,8 +1,5 @@
 # Pokémon ETL and DAG Generator
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)  
-[→ See full changelog](CHANGELOG.md)
-
 <img src="assets/logo.jpeg" alt="Wild Airflow appeared!" width="50%">
 
 ---
@@ -31,6 +28,7 @@ This project is an **ETL pipeline** and **dynamic DAG generator** built with Apa
 - **Postgres** (data storage)
 - **AWS S3** (staging layer)
 - **Docker & Docker Compose** (containerization)
+- **Metabase** (visualization)
 
 ---
 
@@ -75,7 +73,6 @@ project-etl-pokemon/
 ├── CHANGELOG.md
 └── assets/
     ├── logo.jpeg
-    └── etl_flow.png
 ```
 
 ---
@@ -93,8 +90,14 @@ project-etl-pokemon/
 git clone https://github.com/luizgnf/project-etl-pokemon.git
 cd project-etl-pokemon
 
+# Copy the sample environment file and fill in your secrets
+cp .env.profile.example .env.profile
+
 # Build and start the containers
-docker-compose up --build
+make compose-build && make compose-up
+
+# For other useful commands
+make help
 ```
 
 ### Access Airflow UI
@@ -107,6 +110,10 @@ docker-compose up --build
   - `dag_pokedex_pokemon`
   - `dag_poketcg_cards`
   - `dag_cardmarket_history`
+
+### Access Metabase UI
+
+- Metabase: `http://localhost:3000`
 
 ---
 
