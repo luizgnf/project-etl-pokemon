@@ -33,6 +33,9 @@ airflow-logs:
 airflow-bash:
 	@docker compose exec airflow-webserver bash
 
+duckdb-open:
+	@docker compose exec airflow-webserver duckdb data/dev.duckdb
+
 metabase-start:
 	@docker compose start metabase
 
